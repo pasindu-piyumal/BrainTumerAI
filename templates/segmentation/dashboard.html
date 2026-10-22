@@ -1,0 +1,297 @@
+{% extends "segmentation/base.html" %}
+{% load static %}
+
+{% block title %}Dashboard | BrainTumorAI Medical Imaging{% endblock %}
+{% block breadcrumb_current %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="dashboard-hero">
+    <div class="hero-content">
+        <div class="hero-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 6v6l4 2"></path>
+            </svg>
+            <span>U-Net Neural Segmentation • v1.0</span>
+        </div>
+        <h1 class="hero-title">
+            Intelligent Brain MRI <span>Tumor Segmentation</span>
+        </h1>
+        <p class="hero-description">
+            BrainTumorAI utilizes an augmented U-Net deep convolutional architecture to localize and delineate brain lesions with high spatial precision at a 256×256 resolution.
+        </p>
+        <div class="hero-actions">
+            <a href="{% url 'upload_mri' %}" class="btn btn-primary btn-lg">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span>Start New Analysis</span>
+            </a>
+            <a href="{% url 'prediction_history' %}" class="btn btn-secondary btn-lg">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <span>Browse Archive</span>
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- Stats KPI Summary Grid -->
+<section class="stats-grid" aria-label="Key Performance Indicators">
+    <div class="stat-card">
+        <div class="stat-info">
+            <span class="stat-label">Total Analyses</span>
+            <span class="stat-value">{{ total_scans }}</span>
+            <span class="stat-caption">Scans stored in database</span>
+        </div>
+        <div class="stat-icon-wrapper icon-blue" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-info">
+            <span class="stat-label">Tumor Detected</span>
+            <span class="stat-value" style="color: #f87171;">{{ positive_scans }}</span>
+            <span class="stat-caption">Positive mask pixel predictions</span>
+        </div>
+        <div class="stat-icon-wrapper icon-red" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-info">
+            <span class="stat-label">Clear Scans</span>
+            <span class="stat-value" style="color: var(--teal-accent);">{{ negative_scans }}</span>
+            <span class="stat-caption">Zero positive pixels</span>
+        </div>
+        <div class="stat-icon-wrapper icon-teal" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-info">
+            <span class="stat-label">Avg Positive Pixels</span>
+            <span class="stat-value">{{ avg_tumor_pixels|default:"0" }}</span>
+            <span class="stat-caption">Mean pixels (256×256 matrix)</span>
+        </div>
+        <div class="stat-icon-wrapper icon-amber" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="20" x2="18" y2="10"></line>
+                <line x1="12" y1="20" x2="12" y2="4"></line>
+                <line x1="6" y1="20" x2="6" y2="14"></line>
+            </svg>
+        </div>
+    </div>
+</section>
+
+<!-- Workflow Steps Section -->
+<section class="workflow-panel">
+    <div class="card-header">
+        <div>
+            <h2 class="card-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--cyan-accent)" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+                AI Segmentation Workflow
+            </h2>
+            <p class="card-subtitle">End-to-end medical deep learning inference pipeline</p>
+        </div>
+    </div>
+
+    <div class="workflow-steps">
+        <div class="workflow-step">
+            <div class="step-header">
+                <span class="step-num">01</span>
+                <span class="step-title">MRI Ingestion</span>
+            </div>
+            <p class="step-desc">
+                Grayscale axial brain MRI scans (PNG, JPG) are validated, resized with bilinear aspect-ratio padding to 256×256, and normalized to [0, 1].
+            </p>
+        </div>
+
+        <div class="workflow-step">
+            <div class="step-header">
+                <span class="step-num">02</span>
+                <span class="step-title">U-Net Segmentation</span>
+            </div>
+            <p class="step-desc">
+                The trained convolutional model processes feature maps across encoder-decoder skip connections, applying a decision threshold of 0.40.
+            </p>
+        </div>
+
+        <div class="workflow-step">
+            <div class="step-header">
+                <span class="step-num">03</span>
+                <span class="step-title">Interactive Analysis</span>
+            </div>
+            <p class="step-desc">
+                High-contrast binary masks and red composite overlays are generated and made available in an interactive comparison viewer.
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- Analytics & Recent Scans Columns -->
+<div class="dashboard-columns">
+    <!-- Visual Analytics Charts -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h2 class="card-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2">
+                        <line x1="12" y1="20" x2="12" y2="10"></line>
+                        <line x1="18" y1="20" x2="18" y2="4"></line>
+                        <line x1="6" y1="20" x2="6" y2="16"></line>
+                    </svg>
+                    Predicted Pixel Distribution
+                </h2>
+                <p class="card-subtitle">Tumor pixel clusters based on {{ total_scans }} historical analyses</p>
+            </div>
+        </div>
+
+        {% if total_scans > 0 %}
+        <div class="chart-wrapper">
+            <canvas id="distributionChart" aria-label="Tumor Pixel Distribution Chart" role="img"></canvas>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 10px; text-align: center;">
+            * Measured in 2D segmented pixel count (256×256 matrix); not representative of 3D anatomical volume.
+        </div>
+        {% else %}
+        <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+            <p>No MRI predictions recorded yet. Run your first analysis to generate analytics.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Analyses Quick List -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h2 class="card-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal-accent)" stroke-width="2">
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                        <circle cx="12" cy="12" r="10"></circle>
+                    </svg>
+                    Recent Analyses
+                </h2>
+                <p class="card-subtitle">Latest processed brain scans</p>
+            </div>
+            <a href="{% url 'prediction_history' %}" class="btn btn-secondary btn-sm">View All</a>
+        </div>
+
+        {% if recent_predictions %}
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            {% for scan in recent_predictions %}
+            <a href="{% url 'prediction_detail' pk=scan.pk %}" style="display: flex; align-items: center; justify-content: space-between; padding: 12px; background-color: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); transition: all var(--transition-fast);">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    {% if scan.segmentation_overlay %}
+                    <img src="{{ scan.segmentation_overlay.url }}" alt="Scan thumbnail" style="width: 44px; height: 44px; border-radius: var(--radius-sm); object-fit: cover; background: #000;">
+                    {% elif scan.uploaded_image %}
+                    <img src="{{ scan.uploaded_image.url }}" alt="Scan thumbnail" style="width: 44px; height: 44px; border-radius: var(--radius-sm); object-fit: cover; background: #000;">
+                    {% endif %}
+                    <div>
+                        <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-primary); font-family: var(--font-mono);">Scan #{{ scan.id }}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">{{ scan.created_at|date:"M d, Y • H:i" }}</div>
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    {% if scan.has_tumor %}
+                    <span class="badge badge-tumor">{{ scan.predicted_tumor_pixels }} px</span>
+                    {% else %}
+                    <span class="badge badge-clear">Clear</span>
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+            <p style="margin-bottom: 16px;">No MRI scans have been analyzed yet.</p>
+            <a href="{% url 'upload_mri' %}" class="btn btn-primary btn-sm">Start First Analysis</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{% if total_scans > 0 %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const ctx = document.getElementById('distributionChart');
+    if (!ctx) return;
+
+    const dataValues = {{ chart_data.distribution|safe }};
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Clear (0 px)', 'Small (1-500 px)', 'Medium (501-1500 px)', 'Large (>1500 px)'],
+            datasets: [{
+                label: 'Scans',
+                data: dataValues,
+                backgroundColor: [
+                    'rgba(20, 184, 166, 0.65)',
+                    'rgba(14, 165, 233, 0.65)',
+                    'rgba(245, 158, 11, 0.65)',
+                    'rgba(239, 68, 68, 0.65)'
+                ],
+                borderColor: [
+                    '#14b8a6',
+                    '#0ea5e9',
+                    '#f59e0b',
+                    '#ef4444'
+                ],
+                borderWidth: 1.5,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return ` ${context.parsed.y} scan(s)`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(148, 163, 184, 0.1)' },
+                    ticks: { color: '#94a3b8', font: { size: 11 } }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1, color: '#94a3b8', font: { size: 11 } },
+                    grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endif %}
+{% endblock %}
