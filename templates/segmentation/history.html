@@ -1,0 +1,273 @@
+{% extends "segmentation/base.html" %}
+{% load static %}
+
+{% block title %}Prediction History | BrainTumorAI{% endblock %}
+{% block breadcrumb_current %}Prediction History{% endblock %}
+
+{% block content %}
+<div class="results-header-bar">
+    <div class="results-title-group">
+        <div>
+            <h1 style="font-size: 1.6rem; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
+                Prediction Archive & History
+            </h1>
+            <p style="font-size: 0.9rem; color: var(--text-secondary);">
+                Browse, search, inspect, and manage previously analyzed brain MRI scans.
+            </p>
+        </div>
+    </div>
+    <div>
+        <a href="{% url 'upload_mri' %}" class="btn btn-primary btn-sm">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>New Analysis</span>
+        </a>
+    </div>
+</div>
+
+<!-- Search, Filter & Sort Controls -->
+<div class="history-controls">
+    <form method="get" class="history-search-form" action="{% url 'prediction_history' %}">
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Search by Scan ID (e.g. 5) or date..." class="input-field" aria-label="Search Scans">
+        
+        <select name="status" class="select-field" aria-label="Filter by Status" onchange="this.form.submit()">
+            <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Scans</option>
+            <option value="positive" {% if status_filter == 'positive' %}selected{% endif %}>Lesion Detected</option>
+            <option value="negative" {% if status_filter == 'negative' %}selected{% endif %}>Clear (0 px)</option>
+        </select>
+
+        <select name="sort" class="select-field" aria-label="Sort Records" onchange="this.form.submit()">
+            <option value="newest" {% if sort_by == 'newest' %}selected{% endif %}>Newest First</option>
+            <option value="oldest" {% if sort_by == 'oldest' %}selected{% endif %}>Oldest First</option>
+            <option value="pixels_desc" {% if sort_by == 'pixels_desc' %}selected{% endif %}>Highest Pixels</option>
+            <option value="pixels_asc" {% if sort_by == 'pixels_asc' %}selected{% endif %}>Lowest Pixels</option>
+        </select>
+
+        <button type="submit" class="btn btn-secondary btn-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <span>Search</span>
+        </button>
+
+        {% if search_query or status_filter != 'all' or sort_by != 'newest' %}
+        <a href="{% url 'prediction_history' %}" class="btn btn-secondary btn-sm" title="Clear Filters">Reset</a>
+        {% endif %}
+    </form>
+
+    <div style="font-size: 0.85rem; color: var(--text-muted);">
+        Found <strong>{{ total_records }}</strong> record{{ total_records|pluralize }}
+    </div>
+</div>
+
+<!-- Desktop Table View -->
+{% if page_obj.object_list %}
+<div class="table-responsive">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Scan ID</th>
+                <th>Preview Images</th>
+                <th>Analyzed Date</th>
+                <th>Tumor Pixels</th>
+                <th>Threshold</th>
+                <th>Status</th>
+                <th style="text-align: right;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for scan in page_obj.object_list %}
+            <tr>
+                <td>
+                    <span class="table-id-tag">#{{ scan.id }}</span>
+                </td>
+                <td>
+                    <div class="table-thumb-group">
+                        {% if scan.uploaded_image %}
+                        <img src="{{ scan.uploaded_image.url }}" alt="Original MRI Scan" class="table-thumb" title="Original MRI">
+                        {% endif %}
+                        {% if scan.segmentation_overlay %}
+                        <img src="{{ scan.segmentation_overlay.url }}" alt="Segmentation Overlay" class="table-thumb" title="Overlay">
+                        {% endif %}
+                        {% if scan.segmentation_mask %}
+                        <img src="{{ scan.segmentation_mask.url }}" alt="Segmentation Mask" class="table-thumb" title="Mask">
+                        {% endif %}
+                    </div>
+                </td>
+                <td>
+                    <div style="font-weight: 500;">{{ scan.created_at|date:"M d, Y" }}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">{{ scan.created_at|date:"H:i:s" }} UTC</div>
+                </td>
+                <td>
+                    <span style="font-family: var(--font-mono); font-weight: 600;">
+                        {{ scan.predicted_tumor_pixels|default:"0" }}
+                    </span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">px</span>
+                </td>
+                <td>
+                    <span style="font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-muted);">
+                        {{ scan.threshold }}
+                    </span>
+                </td>
+                <td>
+                    {% if scan.has_tumor %}
+                    <span class="badge badge-tumor">Lesion Detected</span>
+                    {% else %}
+                    <span class="badge badge-clear">Clear</span>
+                    {% endif %}
+                </td>
+                <td style="text-align: right;">
+                    <div style="display: inline-flex; align-items: center; gap: 8px;">
+                        <a href="{% url 'prediction_detail' pk=scan.id %}" class="btn btn-secondary btn-sm" title="Inspect Scan in Comparison Viewer">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                            <span>Inspect</span>
+                        </a>
+                        <button type="button" class="btn btn-secondary btn-sm btn-trigger-delete" style="color: #f87171;" data-scan-id="{{ scan.id }}" data-delete-url="{% url 'prediction_delete' pk=scan.id %}" title="Delete Record">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Mobile Card Grid View -->
+<div class="history-cards-mobile">
+    {% for scan in page_obj.object_list %}
+    <div class="history-card-item">
+        <div class="history-card-header">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="table-id-tag">Scan #{{ scan.id }}</span>
+                {% if scan.has_tumor %}
+                <span class="badge badge-tumor">Lesion</span>
+                {% else %}
+                <span class="badge badge-clear">Clear</span>
+                {% endif %}
+            </div>
+            <div style="font-size: 0.78rem; color: var(--text-muted);">
+                {{ scan.created_at|date:"M d, H:i" }}
+            </div>
+        </div>
+
+        <div class="history-card-thumbs">
+            {% if scan.uploaded_image %}
+            <img src="{{ scan.uploaded_image.url }}" alt="Original MRI">
+            {% endif %}
+            {% if scan.segmentation_overlay %}
+            <img src="{{ scan.segmentation_overlay.url }}" alt="Overlay">
+            {% endif %}
+            {% if scan.segmentation_mask %}
+            <img src="{{ scan.segmentation_mask.url }}" alt="Mask">
+            {% endif %}
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
+            <div>
+                <span style="color: var(--text-muted);">Predicted Pixels:</span>
+                <strong style="font-family: var(--font-mono);">{{ scan.predicted_tumor_pixels|default:"0" }} px</strong>
+            </div>
+            <div>
+                <span style="color: var(--text-muted);">Threshold:</span>
+                <span style="font-family: var(--font-mono);">{{ scan.threshold }}</span>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 6px;">
+            <a href="{% url 'prediction_detail' pk=scan.id %}" class="btn btn-secondary btn-sm" style="flex: 1;">
+                Inspect
+            </a>
+            <button type="button" class="btn btn-danger btn-sm btn-trigger-delete" data-scan-id="{{ scan.id }}" data-delete-url="{% url 'prediction_delete' pk=scan.id %}">
+                Delete
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pagination Controls -->
+{% if page_obj.has_other_pages %}
+<div class="pagination-nav">
+    <div style="font-size: 0.85rem; color: var(--text-muted);">
+        Showing Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+    </div>
+
+    <div class="pagination-pages">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter != 'all' %}&status={{ status_filter }}{% endif %}{% if sort_by != 'newest' %}&sort={{ sort_by }}{% endif %}" class="page-btn" aria-label="Previous Page">
+            &laquo;
+        </a>
+        {% endif %}
+
+        {% for p in page_obj.paginator.page_range %}
+            {% if p == page_obj.number %}
+            <span class="page-btn active">{{ p }}</span>
+            {% elif p >= page_obj.number|add:"-2" and p <= page_obj.number|add:"2" %}
+            <a href="?page={{ p }}{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter != 'all' %}&status={{ status_filter }}{% endif %}{% if sort_by != 'newest' %}&sort={{ sort_by }}{% endif %}" class="page-btn">{{ p }}</a>
+            {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter != 'all' %}&status={{ status_filter }}{% endif %}{% if sort_by != 'newest' %}&sort={{ sort_by }}{% endif %}" class="page-btn" aria-label="Next Page">
+            &raquo;
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+<!-- Empty State -->
+<div class="card" style="text-align: center; padding: 60px 20px;">
+    <div style="width: 64px; height: 64px; border-radius: 50%; background-color: var(--primary-subtle); color: var(--cyan-accent); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+    </div>
+    <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">
+        No Matching MRI Predictions Found
+    </h2>
+    <p style="font-size: 0.9rem; color: var(--text-secondary); max-width: 450px; margin: 0 auto 24px;">
+        {% if search_query or status_filter != 'all' %}
+        No analyses matched your filter criteria. Try adjusting your search query or status filter.
+        {% else %}
+        No brain MRI scans have been segmented yet. Start your first analysis to begin populating the clinical archive.
+        {% endif %}
+    </p>
+    {% if search_query or status_filter != 'all' %}
+    <a href="{% url 'prediction_history' %}" class="btn btn-secondary btn-sm">Reset Filters</a>
+    {% else %}
+    <a href="{% url 'upload_mri' %}" class="btn btn-primary btn-sm">Start New Analysis</a>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Delete Confirmation Modal Component -->
+<div id="delete-confirm-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-box">
+        <h3 id="modal-title" class="modal-title">Delete Scan Record</h3>
+        <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5;">
+            Are you sure you want to permanently delete <strong id="delete-modal-scan-id" style="color: var(--text-primary); font-family: var(--font-mono);"></strong>?
+            This will permanently remove the record and all associated MRI images, masks, and overlays from the server.
+        </p>
+        <form id="delete-modal-form" method="post" action="">
+            {% csrf_token %}
+            <div class="modal-actions">
+                <button type="button" id="delete-modal-cancel" class="btn btn-secondary btn-sm">Cancel</button>
+                <button type="submit" class="btn btn-danger btn-sm">Delete Permanently</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
