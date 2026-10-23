@@ -1,0 +1,332 @@
+{% extends "segmentation/base.html" %}
+{% load static %}
+
+{% block title %}Scan #{{ prediction.id }} Results | BrainTumorAI{% endblock %}
+{% block breadcrumb_current %}Scan #{{ prediction.id }} Results{% endblock %}
+
+{% block content %}
+<!-- Results Header Bar -->
+<div class="results-header-bar">
+    <div class="results-title-group">
+        <div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+                <h1 style="font-size: 1.6rem; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono);">
+                    Scan #{{ prediction.id }}
+                </h1>
+                {% if prediction.has_tumor %}
+                <span class="badge badge-tumor">Lesion Detected</span>
+                {% else %}
+                <span class="badge badge-clear">No Lesion Detected</span>
+                {% endif %}
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">
+                Analyzed on {{ prediction.created_at|date:"F d, Y • H:i:s" }} UTC
+            </p>
+        </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <a href="{% url 'upload_mri' %}" class="btn btn-secondary btn-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>New Analysis</span>
+        </a>
+        <a href="{% url 'prediction_history' %}" class="btn btn-secondary btn-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span>Archive</span>
+        </a>
+        <button type="button" class="btn btn-danger btn-sm btn-trigger-delete" data-scan-id="{{ prediction.id }}" data-delete-url="{% url 'prediction_delete' pk=prediction.id %}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <span>Delete</span>
+        </button>
+    </div>
+</div>
+
+<!-- Main Workspace Layout -->
+<div class="results-workspace-layout">
+    <!-- Left Column: Interactive Image Comparison Canvas -->
+    <div class="viewer-card">
+        <!-- Viewer Control Toolbar -->
+        <div class="viewer-toolbar">
+            <!-- View Mode Switcher -->
+            <div class="segmented-tabs" role="tablist" aria-label="Image View Selection">
+                <button type="button" class="tab-btn active" data-view="slider" role="tab" aria-selected="true">
+                    Split Slider
+                </button>
+                <button type="button" class="tab-btn" data-view="sbs" role="tab" aria-selected="false">
+                    Side-by-Side
+                </button>
+                <button type="button" class="tab-btn" data-view="overlay" role="tab" aria-selected="false">
+                    Overlay
+                </button>
+                <button type="button" class="tab-btn" data-view="mask" role="tab" aria-selected="false">
+                    Mask
+                </button>
+            </div>
+
+            <!-- Zoom, Pan, Fullscreen Tools -->
+            <div class="viewer-actions">
+                <span id="zoom-percentage-badge" style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted); min-width: 42px; text-align: center;">100%</span>
+                
+                <button type="button" id="btn-zoom-in" class="icon-btn" title="Zoom In (+25%)" aria-label="Zoom In">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        <line x1="11" y1="8" x2="11" y2="14"></line>
+                        <line x1="8" y1="11" x2="14" y2="11"></line>
+                    </svg>
+                </button>
+
+                <button type="button" id="btn-zoom-out" class="icon-btn" title="Zoom Out (-25%)" aria-label="Zoom Out">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        <line x1="8" y1="11" x2="14" y2="11"></line>
+                    </svg>
+                </button>
+
+                <button type="button" id="btn-zoom-reset" class="icon-btn" title="Reset Zoom (100%)" aria-label="Reset Zoom">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                        <path d="M3 3v5h5"></path>
+                    </svg>
+                </button>
+
+                <button type="button" id="btn-pan-toggle" class="icon-btn" title="Toggle Drag & Pan" aria-label="Toggle Pan">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="5 9 2 12 5 15"></polyline>
+                        <polyline points="9 5 12 2 15 5"></polyline>
+                        <polyline points="15 19 12 22 9 19"></polyline>
+                        <polyline points="19 9 22 12 19 15"></polyline>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <line x1="12" y1="2" x2="12" y2="22"></line>
+                    </svg>
+                </button>
+
+                <button type="button" id="btn-fullscreen-toggle" class="icon-btn" title="Toggle Fullscreen" aria-label="Toggle Fullscreen">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Viewport Stage -->
+        <div id="image-viewport" class="image-viewport" tabindex="0" aria-label="MRI Visualizer Canvas">
+            <div id="viewport-content" class="viewport-content">
+                <!-- Mode 1: Interactive Split Slider -->
+                <div id="view-slider" class="slider-container">
+                    <div id="comparison-slider-container" style="position: relative; width: 100%; height: 100%;">
+                        <!-- Left Base Layer: Original MRI -->
+                        {% if prediction.uploaded_image %}
+                        <img src="{{ prediction.uploaded_image.url }}" alt="Original MRI Scan" class="slider-img">
+                        <div class="slider-label slider-label-left">Original MRI</div>
+                        {% endif %}
+
+                        <!-- Right Overlay Layer: Revealing Segmentation Overlay -->
+                        {% if prediction.segmentation_overlay %}
+                        <div id="slider-overlay-wrapper" class="slider-img-overlay" style="clip-path: inset(0 0 0 50%);">
+                            <img src="{{ prediction.segmentation_overlay.url }}" alt="Segmented Overlay Scan" class="slider-img overlay-layer-img">
+                            <div class="slider-label slider-label-right">U-Net Overlay</div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Draggable Split Divider Line & Handle -->
+                        <div id="slider-divider" class="slider-divider-line" style="left: 50%;">
+                            <div id="slider-handle" class="slider-handle">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                    <polyline points="15 18 9 12 15 6"></polyline>
+                                    <polyline points="9 18 3 12 9 6" style="display: none;"></polyline>
+                                </svg>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left: -6px;">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mode 2: Side-by-Side View -->
+                <div id="view-side-by-side" class="side-by-side-grid">
+                    {% if prediction.uploaded_image %}
+                    <div class="sbs-panel">
+                        <span class="sbs-title">Original MRI</span>
+                        <img src="{{ prediction.uploaded_image.url }}" alt="Original MRI">
+                    </div>
+                    {% endif %}
+
+                    {% if prediction.segmentation_mask %}
+                    <div class="sbs-panel">
+                        <span class="sbs-title">Binary Mask</span>
+                        <img src="{{ prediction.segmentation_mask.url }}" alt="Predicted Binary Mask">
+                    </div>
+                    {% endif %}
+
+                    {% if prediction.segmentation_overlay %}
+                    <div class="sbs-panel">
+                        <span class="sbs-title">Color Overlay</span>
+                        <img src="{{ prediction.segmentation_overlay.url }}" alt="Segmentation Overlay" class="overlay-layer-img">
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Mode 3: Single Overlay View -->
+                <div id="view-single-overlay" style="display: none; width: 100%; height: 100%;">
+                    {% if prediction.segmentation_overlay %}
+                    <img src="{{ prediction.segmentation_overlay.url }}" alt="Segmentation Overlay" style="width: 100%; height: 100%; object-fit: contain;" class="overlay-layer-img">
+                    {% endif %}
+                </div>
+
+                <!-- Mode 4: Single Mask View -->
+                <div id="view-single-mask" style="display: none; width: 100%; height: 100%;">
+                    {% if prediction.segmentation_mask %}
+                    <img src="{{ prediction.segmentation_mask.url }}" alt="Segmentation Mask" style="width: 100%; height: 100%; object-fit: contain;">
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Opacity Slider Row -->
+        <div class="opacity-slider-row">
+            <span style="font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">
+                Overlay Opacity
+            </span>
+            <input type="range" id="overlay-opacity-range" min="0" max="100" value="100" aria-label="Segmentation Overlay Opacity">
+            <span id="opacity-value-label" style="font-family: var(--font-mono); font-size: 0.82rem; min-width: 38px; text-align: right; color: var(--cyan-accent);">100%</span>
+        </div>
+    </div>
+
+    <!-- Right Column: Quantitative Metrics & Export -->
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+        <div class="metrics-card">
+            <h2 class="card-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--cyan-accent)" stroke-width="2">
+                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                </svg>
+                Quantitative Inference Metrics
+            </h2>
+
+            <div class="metrics-row">
+                <div class="metric-label-group">
+                    <span class="metric-name">Predicted Tumor Pixels</span>
+                    <span class="metric-subtext">Sum of positive mask coordinates</span>
+                </div>
+                <div class="metric-digit" style="color: {% if prediction.has_tumor %}#f87171{% else %}var(--teal-accent){% endif %};">
+                    {{ prediction.predicted_tumor_pixels|default:"0" }} <span style="font-size: 0.8rem; font-weight: 500; color: var(--text-muted);">px</span>
+                </div>
+            </div>
+
+            <div class="metrics-row">
+                <div class="metric-label-group">
+                    <span class="metric-name">Canvas Pixel Coverage</span>
+                    <span class="metric-subtext">Area coverage within 256×256 matrix</span>
+                </div>
+                <div class="metric-digit">
+                    {{ prediction.tumor_percentage }}%
+                </div>
+            </div>
+
+            <div class="metrics-row">
+                <div class="metric-label-group">
+                    <span class="metric-name">Inference Decision Threshold</span>
+                    <span class="metric-subtext">Sigmoid probability cutoff</span>
+                </div>
+                <div class="metric-digit">
+                    {{ prediction.threshold }}
+                </div>
+            </div>
+
+            <div class="metrics-row">
+                <div class="metric-label-group">
+                    <span class="metric-name">Resolution & Channels</span>
+                    <span class="metric-subtext">Tensorflow input matrix</span>
+                </div>
+                <div class="metric-digit" style="font-size: 1rem;">
+                    256 × 256 × 1
+                </div>
+            </div>
+
+            <!-- Color Legend -->
+            <div class="color-legend">
+                <div class="legend-title">Overlay Color Code</div>
+                <div class="legend-item">
+                    <span class="legend-swatch swatch-tumor"></span>
+                    <span><strong>Red Highlight:</strong> Predicted lesion tissue (Probability &ge; {{ prediction.threshold }})</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-swatch swatch-healthy"></span>
+                    <span><strong>Grayscale Base:</strong> Healthy parenchyma and skull background</span>
+                </div>
+            </div>
+
+            <!-- Export & Download Actions -->
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
+                {% if prediction.segmentation_overlay %}
+                <a href="{{ prediction.segmentation_overlay.url }}" download="scan_{{ prediction.id }}_overlay.png" class="btn btn-secondary btn-sm" style="width: 100%;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>Download Overlay Image (.png)</span>
+                </a>
+                {% endif %}
+
+                {% if prediction.segmentation_mask %}
+                <a href="{{ prediction.segmentation_mask.url }}" download="scan_{{ prediction.id }}_mask.png" class="btn btn-secondary btn-sm" style="width: 100%;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>Download Binary Mask (.png)</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Clinical Disclaimer Note -->
+        <div class="card" style="background-color: var(--primary-subtle); border-color: var(--border-color-highlight);">
+            <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="flex-shrink: 0; margin-top: 2px;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <div style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5;">
+                    <strong style="color: var(--text-primary); display: block; margin-bottom: 2px;">Research Disclaimer</strong>
+                    This automated delineation is an AI-generated statistical prediction. It does not classify tumor histology or clinical malignancy and must not be used as an independent diagnostic conclusion.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal Component -->
+<div id="delete-confirm-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-box">
+        <h3 id="modal-title" class="modal-title">Delete Scan Record</h3>
+        <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5;">
+            Are you sure you want to permanently delete <strong id="delete-modal-scan-id" style="color: var(--text-primary); font-family: var(--font-mono);"></strong>?
+            This will permanently remove the record and all associated MRI images, masks, and overlays from the server.
+        </p>
+        <form id="delete-modal-form" method="post" action="">
+            {% csrf_token %}
+            <div class="modal-actions">
+                <button type="button" id="delete-modal-cancel" class="btn btn-secondary btn-sm">Cancel</button>
+                <button type="submit" class="btn btn-danger btn-sm">Delete Permanently</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
