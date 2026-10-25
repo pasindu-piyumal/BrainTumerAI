@@ -1,0 +1,39 @@
+# Virtual environment
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Dataset
+data
+data/raw/
+data/processed/
+data/segmentation_task/
+
+# Trained models
+models/*.h5
+models/*.keras
+models/*.pt
+models/*.pth
+
+# Generated outputs
+outputs/
+
+# IDE
+.vscode/
+
+# Environment
+.env
+
+# models
+models
+
+#media
+media
+
+#datasbase
+db.sqlite3
